@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "mace",
+  "version": "1.0.0",
+  "name": "Mace \ud83d\uddff",
+  "description": "Adds the Wind Charged enchantment for the Mace",
+  "authors": [
+    "You"
+  ],
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "net.example.mace.MaceMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.11",
+    "fabric": "*",
+    "minecraft": "1.21.10"
+  }
+}
