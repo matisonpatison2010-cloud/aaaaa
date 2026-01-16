@@ -4,27 +4,22 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.Enchantments;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.ActionResult;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.TypedActionResult;
-import net.minecraft.world.World;
 
 public class MaceMod implements ModInitializer {
 
     public static final String MODID = "mace";
 
     public static final RegistryKey<Enchantment> WIND_CHARGED_KEY =
-            RegistryKey.of(Registries.ENCHANTMENT.getKey(), Identifier.of(MODID, "wind_charged"));
+            RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(MODID, "wind_charged"));
 
     @Override
     public void onInitialize() {
@@ -37,7 +32,7 @@ public class MaceMod implements ModInitializer {
 
             RegistryEntry<Enchantment> entry =
                     player.getWorld().getRegistryManager()
-                            .get(Registries.ENCHANTMENT)
+                            .get(RegistryKeys.ENCHANTMENT)
                             .getEntry(WIND_CHARGED_KEY)
                             .orElse(null);
 
