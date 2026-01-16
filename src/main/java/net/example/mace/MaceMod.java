@@ -11,7 +11,6 @@ import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.TypedActionResult;
@@ -21,7 +20,7 @@ public class MaceMod implements ModInitializer {
 
     public static final String MODID = "mace";
 
-    // Registry key for the Wind Charged enchantment (defined via JSON)
+    // Registry key for Wind Charged enchantment (defined in JSON)
     public static final RegistryKey<Enchantment> WIND_CHARGED_KEY =
             RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(MODID, "wind_charged"));
 
@@ -35,7 +34,7 @@ public class MaceMod implements ModInitializer {
 
             ItemStack stack = player.getStackInHand(hand);
 
-            // Only works with mace
+            // Only works with a mace
             if (stack.getItem() != Items.MACE) {
                 return TypedActionResult.pass(stack);
             }
@@ -63,7 +62,7 @@ public class MaceMod implements ModInitializer {
             }
 
             // Launch strength:
-            // Level I = ~5 blocks
+            // Level I ≈ 5 blocks
             // +3 blocks per level
             double launchVelocity = 1.0 + (level * 0.6);
             player.addVelocity(0, launchVelocity, 0);
@@ -72,12 +71,9 @@ public class MaceMod implements ModInitializer {
             // Prevent fall damage
             player.fallDistance = 0;
 
-            // Wind charge explosion sound
-            world.playSound(
-                    null,
-                    player.getBlockPos(),
+            // Wind charge burst sound (FIXED)
+            player.playSound(
                     SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST,
-                    SoundCategory.PLAYERS,
                     1.2f,
                     1.0f
             );
@@ -89,9 +85,9 @@ public class MaceMod implements ModInitializer {
                         player.getX(),
                         player.getY(),
                         player.getZ(),
-                        25,          // particle count
+                        25,            // particle count
                         0.5, 0.2, 0.5, // spread
-                        0.12         // speed
+                        0.12           // speed
                 );
             }
 
