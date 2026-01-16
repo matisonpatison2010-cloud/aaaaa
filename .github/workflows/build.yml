@@ -18,6 +18,11 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      - name: Set up Gradle 8.8
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.8
+
       - name: Build mod
         run: gradle build
 
@@ -25,4 +30,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mace-mod
-          path: build/libs/
+          path: build/libs/*.jar
