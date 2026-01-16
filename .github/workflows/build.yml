@@ -18,14 +18,11 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Make Gradle executable
-        run: chmod +x gradlew
-
       - name: Build mod
-        run: ./gradlew build
+        run: gradle build
 
-      - name: Upload built JAR
+      - name: Upload build JAR
         uses: actions/upload-artifact@v4
         with:
-          name: built-mod
-          path: build/libs/*.jar
+          name: mace-mod
+          path: build/libs/
