@@ -6,7 +6,6 @@ import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.particle.ParticleTypes;
@@ -31,20 +30,18 @@ public class MaceMod implements ModInitializer {
     public static final RegistryKey<Enchantment> WIND_CHARGED_KEY =
             RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(MODID, "wind_charged"));
 
-    // Players immune to fall damage after launch
     private static final Set<UUID> NO_FALL_DAMAGE = new HashSet<>();
 
     @Override
     public void onInitialize() {
 
-        // Handle right-click ability
+        // Right-click ability
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (world.isClient) {
                 return TypedActionResult.pass(player.getStackInHand(hand));
             }
 
             ItemStack stack = player.getStackInHand(hand);
-
             if (stack.getItem() != Items.MACE) {
                 return TypedActionResult.pass(stack);
             }
@@ -64,29 +61,17 @@ public class MaceMod implements ModInitializer {
                 return TypedActionResult.fail(stack);
             }
 
-            // Launch strength
+            // Launch player
             double launchVelocity = 1.0 + (level * 0.6);
             player.addVelocity(0, launchVelocity, 0);
             player.velocityModified = true;
 
-            // Mark player as immune to fall damage
+            // Prevent fall damage
             NO_FALL_DAMAGE.add(player.getUuid());
 
-            // ✅ PLAY SOUND (SERVER → CLIENT)
             if (world instanceof ServerWorld serverWorld) {
+
+                // Sound
                 serverWorld.playSound(
                         null,
                         player.getX(),
-                        player.getY(),
-                        player.getZ(),
-                        SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST.value(),
-                        SoundCategory.PLAYERS,
-                        1.2f,
-                        1.0f
-                );
-
-                // Wind particles
-                serverWorld.spawnParticles(
-                        ParticleTypes.GUST,
-                        player.getX(),
-                        player.getY(),
