@@ -23,7 +23,7 @@ import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.particle.ParticleTypes;
-import net.minecraft.damage.DamageTypes;
+import net.minecraft.entity.damage.DamageTypes;
 
 import java.util.HashSet;
 import java.util.Set;
