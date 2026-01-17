@@ -29,15 +29,17 @@ public class MaceMod implements ModInitializer {
             if (hand != Hand.MAIN_HAND) return TypedActionResult.pass(player.getStackInHand(hand));
 
             ItemStack stack = player.getStackInHand(hand);
-            if (!stack.hasNbt()) return TypedActionResult.pass(stack);
 
-            NbtCompound macemod = stack.getNbt().getCompound(MODID);
+            // ✅ FIX 1: NBT access
+            if (stack.getNbt() == null) return TypedActionResult.pass(stack);
+
+            NbtCompound macemod = stack.getOrCreateNbt().getCompound(MODID);
             if (macemod.isEmpty()) return TypedActionResult.pass(stack);
 
             boolean hasWind = macemod.contains("wind_charged");
             boolean hasMist = macemod.contains("ender_mist");
 
-            // Incompatible
+            // ❌ Incompatible
             if (hasWind && hasMist) return TypedActionResult.fail(stack);
 
             /* ================= WIND CHARGED ================= */
@@ -102,8 +104,9 @@ public class MaceMod implements ModInitializer {
                     cloud.setDuration((3 + level) * 20);
                     cloud.setRadiusGrowth(-0.01f);
 
+                    // ✅ FIX 2: correct damage effect
                     cloud.addEffect(new StatusEffectInstance(
-                            StatusEffects.HARM,
+                            StatusEffects.INSTANT_DAMAGE,
                             1,
                             1
                     ));
