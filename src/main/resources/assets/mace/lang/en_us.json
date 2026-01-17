@@ -1,4 +1,9 @@
 {
-  "enchantment.mace.wind_charged": "Wind Charged",
-  "enchantment.mace.ender_mist": "Ender Mist"
+  "itemGroup.macemod": "Mace Mod",
+
+  "macemod.wind_charged": "Wind Charged",
+  "macemod.wind_charged.desc": "Launches you upward when used",
+
+  "macemod.ender_mist": "Ender Mist",
+  "macemod.ender_mist.desc": "Releases lingering dragon breath"
 }
