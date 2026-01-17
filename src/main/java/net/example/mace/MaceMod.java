@@ -5,15 +5,16 @@ import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.AreaEffectCloudEntity;
-import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
+import net.minecraft.tag.ItemTags;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.TypedActionResult;
 import net.minecraft.world.World;
@@ -21,8 +22,6 @@ import net.minecraft.world.World;
 public class MaceMod implements ModInitializer {
 
     public static final String MODID = "mace";
-
-    /* ---------------- ENCHANTMENT KEYS ---------------- */
 
     public static final RegistryKey<Enchantment> WIND_CHARGED =
             RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(MODID, "wind_charged"));
@@ -38,8 +37,8 @@ public class MaceMod implements ModInitializer {
 
             ItemStack stack = player.getStackInHand(hand);
 
-            /* ---------------- WIND CHARGED ---------------- */
-            if (stack.getItem() == Items.MACE) {
+            /* ---------- WIND CHARGED ---------- */
+            if (stack.isOf(Items.MACE)) {
 
                 RegistryEntry<Enchantment> wind =
                         world.getRegistryManager()
@@ -52,12 +51,9 @@ public class MaceMod implements ModInitializer {
 
                     if (level > 0 && !player.getItemCooldownManager().isCoolingDown(stack.getItem())) {
 
-                        double launch = 1.0 + (level * 0.6);
-                        player.addVelocity(0, launch, 0);
+                        double boost = 1.0 + (level * 0.6);
+                        player.addVelocity(0, boost, 0);
                         player.velocityModified = true;
-
-                        // IMPORTANT: only cancel fall damage CAUSED by the launch
-                        player.setOnGround(false);
                         player.fallDistance = 0;
 
                         world.playSound(
@@ -69,15 +65,17 @@ public class MaceMod implements ModInitializer {
                                 1.0f
                         );
 
-                        ((World) world).spawnParticles(
-                                ParticleTypes.GUST,
-                                player.getX(),
-                                player.getY(),
-                                player.getZ(),
-                                20,
-                                0.3, 0.1, 0.3,
-                                0.02
-                        );
+                        if (world instanceof ServerWorld serverWorld) {
+                            serverWorld.spawnParticles(
+                                    ParticleTypes.GUST,
+                                    player.getX(),
+                                    player.getY(),
+                                    player.getZ(),
+                                    20,
+                                    0.3, 0.1, 0.3,
+                                    0.02
+                            );
+                        }
 
                         player.getItemCooldownManager().set(stack.getItem(), 100);
                         return TypedActionResult.success(stack);
@@ -85,13 +83,8 @@ public class MaceMod implements ModInitializer {
                 }
             }
 
-            /* ---------------- ENDER MIST ---------------- */
-            if (stack.isOf(Items.MACE)
-                    || stack.isOf(Items.SWORD)
-                    || stack.isOf(Items.AXE)
-                    || stack.isOf(Items.PICKAXE)
-                    || stack.isOf(Items.SHOVEL)
-                    || stack.isOf(Items.HOE)) {
+            /* ---------- ENDER MIST ---------- */
+            if (stack.isIn(ItemTags.TOOLS)) {
 
                 RegistryEntry<Enchantment> mist =
                         world.getRegistryManager()
@@ -109,10 +102,8 @@ public class MaceMod implements ModInitializer {
 
                         cloud.setParticleType(ParticleTypes.DRAGON_BREATH);
                         cloud.setRadius(3.0F);
-                        cloud.setDuration((3 + level) * 20); // 3s + 1s per tier
-                        cloud.setRadiusGrowth(0);
+                        cloud.setDuration((3 + level) * 20);
                         cloud.setOwner(player);
-                        cloud.addEffect(StatusEffects.HARM.createStatusEffect(1, 1));
 
                         world.spawnEntity(cloud);
 
@@ -125,7 +116,7 @@ public class MaceMod implements ModInitializer {
                                 1.0f
                         );
 
-                        player.getItemCooldownManager().set(stack.getItem(), 400); // 20s
+                        player.getItemCooldownManager().set(stack.getItem(), 400);
                         return TypedActionResult.success(stack);
                     }
                 }
