@@ -4,7 +4,19 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentTarget;
+WIND_CHARGED = Registry.register(
+        Registries.ENCHANTMENT,
+        Identifier.of(MODID, "wind_charged"),
+        new Enchantment(
+                Enchantment.Rarity.RARE,
+                new EquipmentSlot[]{EquipmentSlot.MAINHAND}
+        ) {
+            @Override
+            public boolean isAcceptableItem(ItemStack stack) {
+                return stack.isOf(Items.MACE);
+            }
+        }
+);
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
