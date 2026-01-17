@@ -2,50 +2,39 @@ package net.example.mace;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
-import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.enchantment.Enchantment;
-WIND_CHARGED = Registry.register(
-        Registries.ENCHANTMENT,
-        Identifier.of(MODID, "wind_charged"),
-        new Enchantment(
-                Enchantment.Rarity.RARE,
-                new EquipmentSlot[]{EquipmentSlot.MAINHAND}
-        ) {
-            @Override
-            public boolean isAcceptableItem(ItemStack stack) {
-                return stack.isOf(Items.MACE);
-            }
-        }
-);
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.ActionResult;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.util.TypedActionResult;
 
 public class MaceMod implements ModInitializer {
+
     public static final String MODID = "mace";
 
     public static Enchantment WIND_CHARGED;
 
+    public static final RegistryKey<Enchantment> WIND_CHARGED_KEY =
+            RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(MODID, "wind_charged"));
+
     @Override
     public void onInitialize() {
 
-        // ─── Wind Charged Enchantment ───
+        // Register Wind Charged enchantment (MACE ONLY)
         WIND_CHARGED = Registry.register(
                 Registries.ENCHANTMENT,
                 Identifier.of(MODID, "wind_charged"),
                 new Enchantment(
                         Enchantment.Rarity.RARE,
-                        EnchantmentTarget.WEAPON,
                         new EquipmentSlot[]{EquipmentSlot.MAINHAND}
                 ) {
                     @Override
@@ -55,59 +44,43 @@ public class MaceMod implements ModInitializer {
                 }
         );
 
-        // ─── Right Click Ability ───
+        // Wind Charged ability
         UseItemCallback.EVENT.register((player, world, hand) -> {
-            if (world.isClient) return ActionResult.PASS;
+            if (world.isClient) return TypedActionResult.pass(player.getStackInHand(hand));
 
             ItemStack stack = player.getStackInHand(hand);
-            if (!stack.hasEnchantments()) return ActionResult.PASS;
+            if (!stack.isOf(Items.MACE)) return TypedActionResult.pass(stack);
 
-            if (stack.getEnchantments().toString().contains("wind_charged")) {
+            RegistryEntry<Enchantment> entry =
+                    world.getRegistryManager()
+                            .get(RegistryKeys.ENCHANTMENT)
+                            .getEntry(WIND_CHARGED_KEY)
+                            .orElse(null);
 
-                // Launch player upward
-                player.addVelocity(0, 1.2, 0);
-                player.velocityModified = true;
+            if (entry == null) return TypedActionResult.pass(stack);
 
-                // Play wind charge sound
-                world.playSound(
-                        null,
-                        player.getBlockPos(),
-                        SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST,
-                        SoundCategory.PLAYERS,
-                        1.0f,
-                        1.0f
-                );
+            int level = EnchantmentHelper.getLevel(entry, stack);
+            if (level <= 0) return TypedActionResult.pass(stack);
 
-                // Spawn particles
-                for (int i = 0; i < 40; i++) {
-                    Vec3d p = player.getPos().add(
-                            world.random.nextGaussian() * 0.3,
-                            0.1,
-                            world.random.nextGaussian() * 0.3
-                    );
-                    world.addParticle(
-                            ParticleTypes.CLOUD,
-                            p.x, p.y, p.z,
-                            0, 0.1, 0
-                    );
-                }
+            if (player.getItemCooldownManager().isCoolingDown(stack.getItem()))
+                return TypedActionResult.fail(stack);
 
-                // Mark player to cancel fall damage ONCE
-                player.getPersistentData().putBoolean("wind_charged_jump", true);
+            double launch = 1.0 + (level * 0.6);
+            player.addVelocity(0, launch, 0);
+            player.velocityModified = true;
+            player.fallDistance = 0;
 
-                return ActionResult.SUCCESS;
-            }
+            world.playSound(
+                    null,
+                    player.getBlockPos(),
+                    SoundEvents.ENTITY_WIND_CHARGE_THROW,
+                    SoundCategory.PLAYERS,
+                    1f,
+                    1f
+            );
 
-            return ActionResult.PASS;
-        });
-
-        // ─── Cancel Fall Damage ONLY After Ability ───
-        PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, blockEntity) -> {
-            if (player.getPersistentData().getBoolean("wind_charged_jump")) {
-                player.fallDistance = 0;
-                player.getPersistentData().remove("wind_charged_jump");
-            }
-            return true;
+            player.getItemCooldownManager().set(stack.getItem(), 100);
+            return TypedActionResult.success(stack);
         });
     }
 }
