@@ -1,197 +1,137 @@
 package net.example.mace;
 
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.AreaEffectCloudEntity;
-import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.TypedActionResult;
 import net.minecraft.world.World;
 
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
-
 public class MaceMod implements ModInitializer {
 
     public static final String MODID = "mace";
 
-    // Enchantment keys
-    public static final RegistryKey<Enchantment> WIND_CHARGED_KEY =
+    /* ---------------- ENCHANTMENT KEYS ---------------- */
+
+    public static final RegistryKey<Enchantment> WIND_CHARGED =
             RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(MODID, "wind_charged"));
 
-    public static final RegistryKey<Enchantment> ENDER_MIST_KEY =
+    public static final RegistryKey<Enchantment> ENDER_MIST =
             RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(MODID, "ender_mist"));
-
-    // State
-    private static final Set<UUID> WIND_LAUNCHED = new HashSet<>();
 
     @Override
     public void onInitialize() {
 
-        /* ===============================
-           RIGHT-CLICK ABILITIES
-           =============================== */
         UseItemCallback.EVENT.register((player, world, hand) -> {
-
-            if (world.isClient) {
-                return TypedActionResult.pass(player.getStackInHand(hand));
-            }
+            if (world.isClient) return TypedActionResult.pass(player.getStackInHand(hand));
 
             ItemStack stack = player.getStackInHand(hand);
-            if (stack.isEmpty()) return TypedActionResult.pass(stack);
 
-            /* -------- WIND CHARGED -------- */
+            /* ---------------- WIND CHARGED ---------------- */
             if (stack.getItem() == Items.MACE) {
 
-                RegistryEntry<Enchantment> windEntry =
+                RegistryEntry<Enchantment> wind =
                         world.getRegistryManager()
                                 .get(RegistryKeys.ENCHANTMENT)
-                                .getEntry(WIND_CHARGED_KEY)
+                                .getEntry(WIND_CHARGED)
                                 .orElse(null);
 
-                if (windEntry != null) {
-                    int level = EnchantmentHelper.getLevel(windEntry, stack);
+                if (wind != null) {
+                    int level = EnchantmentHelper.getLevel(wind, stack);
 
-                    if (level > 0 &&
-                            !player.getItemCooldownManager().isCoolingDown(stack.getItem())) {
+                    if (level > 0 && !player.getItemCooldownManager().isCoolingDown(stack.getItem())) {
 
-                        // Launch (≈ 5 blocks at level 1, +3 per level)
-                        double velocity = 0.42 + (level * 0.25);
-                        player.addVelocity(0, velocity, 0);
+                        double launch = 1.0 + (level * 0.6);
+                        player.addVelocity(0, launch, 0);
                         player.velocityModified = true;
-                        player.fallDistance = 0;
 
-                        WIND_LAUNCHED.add(player.getUuid());
+                        // IMPORTANT: only cancel fall damage CAUSED by the launch
+                        player.setOnGround(false);
+                        player.fallDistance = 0;
 
                         world.playSound(
                                 null,
                                 player.getBlockPos(),
-                                SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST.value(),
+                                SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST,
                                 SoundCategory.PLAYERS,
                                 1.0f,
                                 1.0f
                         );
 
-                        if (world instanceof ServerWorld serverWorld) {
-                            serverWorld.spawnParticles(
-                                    ParticleTypes.GUST,
-                                    player.getX(),
-                                    player.getY(),
-                                    player.getZ(),
-                                    30,
-                                    0.3, 0.2, 0.3,
-                                    0.02
-                            );
-                        }
+                        ((World) world).spawnParticles(
+                                ParticleTypes.GUST,
+                                player.getX(),
+                                player.getY(),
+                                player.getZ(),
+                                20,
+                                0.3, 0.1, 0.3,
+                                0.02
+                        );
 
-                        player.getItemCooldownManager().set(stack.getItem(), 100); // 5s
+                        player.getItemCooldownManager().set(stack.getItem(), 100);
                         return TypedActionResult.success(stack);
                     }
                 }
             }
 
-            /* -------- ENDER MIST -------- */
-            RegistryEntry<Enchantment> mistEntry =
-                    world.getRegistryManager()
-                            .get(RegistryKeys.ENCHANTMENT)
-                            .getEntry(ENDER_MIST_KEY)
-                            .orElse(null);
+            /* ---------------- ENDER MIST ---------------- */
+            if (stack.isOf(Items.MACE)
+                    || stack.isOf(Items.SWORD)
+                    || stack.isOf(Items.AXE)
+                    || stack.isOf(Items.PICKAXE)
+                    || stack.isOf(Items.SHOVEL)
+                    || stack.isOf(Items.HOE)) {
 
-            if (mistEntry != null) {
-                int level = EnchantmentHelper.getLevel(mistEntry, stack);
+                RegistryEntry<Enchantment> mist =
+                        world.getRegistryManager()
+                                .get(RegistryKeys.ENCHANTMENT)
+                                .getEntry(ENDER_MIST)
+                                .orElse(null);
 
-                if (level > 0 &&
-                        !player.getItemCooldownManager().isCoolingDown(stack.getItem())) {
+                if (mist != null) {
+                    int level = EnchantmentHelper.getLevel(mist, stack);
 
-                    int duration = (3 + level) * 20;
+                    if (level > 0 && !player.getItemCooldownManager().isCoolingDown(stack.getItem())) {
 
-                    world.playSound(
-                            null,
-                            player.getBlockPos(),
-                            SoundEvents.ENTITY_ENDER_DRAGON_SHOOT.value(),
-                            SoundCategory.PLAYERS,
-                            1.2f,
-                            1.0f
-                    );
+                        AreaEffectCloudEntity cloud =
+                                new AreaEffectCloudEntity(world, player.getX(), player.getY(), player.getZ());
 
-                    if (world instanceof ServerWorld serverWorld) {
-                        AreaEffectCloudEntity cloud = new AreaEffectCloudEntity(
-                                serverWorld,
-                                player.getX(),
-                                player.getY(),
-                                player.getZ()
+                        cloud.setParticleType(ParticleTypes.DRAGON_BREATH);
+                        cloud.setRadius(3.0F);
+                        cloud.setDuration((3 + level) * 20); // 3s + 1s per tier
+                        cloud.setRadiusGrowth(0);
+                        cloud.setOwner(player);
+                        cloud.addEffect(StatusEffects.HARM.createStatusEffect(1, 1));
+
+                        world.spawnEntity(cloud);
+
+                        world.playSound(
+                                null,
+                                player.getBlockPos(),
+                                SoundEvents.ENTITY_ENDER_DRAGON_SHOOT,
+                                SoundCategory.PLAYERS,
+                                1.2f,
+                                1.0f
                         );
 
-                        cloud.setOwner(player);
-                        cloud.setParticleType(ParticleTypes.DRAGON_BREATH);
-                        cloud.setRadius(3.5f);
-                        cloud.setDuration(duration);
-                        cloud.setWaitTime(0);
-                        cloud.setRadiusGrowth(-cloud.getRadius() / duration);
-
-                        cloud.addEffect(new StatusEffectInstance(
-                                StatusEffects.INSTANT_DAMAGE,
-                                1,
-                                1
-                        ));
-
-                        serverWorld.spawnEntity(cloud);
+                        player.getItemCooldownManager().set(stack.getItem(), 400); // 20s
+                        return TypedActionResult.success(stack);
                     }
-
-                    player.getItemCooldownManager().set(stack.getItem(), 20 * 20); // 20s
-                    return TypedActionResult.success(stack);
                 }
             }
 
             return TypedActionResult.pass(stack);
-        });
-
-        /* ===============================
-           DAMAGE CONTROL
-           =============================== */
-
-        // Prevent fall damage only after Wind Charged
-        ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
-            if (entity instanceof ServerPlayerEntity player) {
-
-                if (source.isOf(DamageTypes.FALL)
-                        && WIND_LAUNCHED.contains(player.getUuid())) {
-                    return false;
-                }
-
-                if (source.getSource() instanceof AreaEffectCloudEntity cloud
-                        && cloud.getOwner() == player) {
-                    return false;
-                }
-            }
-            return true;
-        });
-
-        // Remove fall immunity when landing
-        ServerTickEvents.END_SERVER_TICK.register((MinecraftServer server) -> {
-            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-                if (player.isOnGround()) {
-                    WIND_LAUNCHED.remove(player.getUuid());
-                }
-            }
         });
     }
 }
