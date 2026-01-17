@@ -4,9 +4,10 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
 import net.minecraft.particle.ParticleTypes;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.ActionResult;
@@ -22,76 +23,81 @@ public class MaceMod implements ModInitializer {
     public void onInitialize() {
 
         UseItemCallback.EVENT.register((player, world, hand) -> {
-            if (world.isClient) {
+            if (world.isClient()) {
                 return TypedActionResult.pass(player.getStackInHand(hand));
             }
 
-            // MAIN HAND ONLY
+            // ONLY MAIN HAND
             if (hand != player.getActiveHand()) {
                 return TypedActionResult.pass(player.getStackInHand(hand));
             }
 
             ItemStack stack = player.getMainHandStack();
 
-            // Only works with the mace
-            if (!stack.isOf(Items.MACE)) {
-                return TypedActionResult.pass(stack);
+            // ----------------------------
+            // WIND CHARGED (launch up 8 blocks)
+            // ----------------------------
+            if (stack.hasCustomName()
+                    && stack.getName().getString().contains("Wind Charged")) {
+
+                Vec3d velocity = player.getVelocity();
+                player.setVelocity(velocity.x, 1.1D, velocity.z);
+                player.velocityModified = true;
+
+                world.playSound(
+                        null,
+                        player.getBlockPos(),
+                        SoundEvents.ENTITY_WIND_CHARGE_THROW,
+                        SoundCategory.PLAYERS,
+                        1.0f,
+                        1.0f
+                );
+
+                return TypedActionResult.success(stack);
             }
 
-            // --------------------
-            // WIND CHARGED
-            // Launch player ~8 blocks upward
-            // --------------------
-            Vec3d velocity = player.getVelocity();
-            player.setVelocity(velocity.x, 1.6, velocity.z);
-            player.velocityModified = true;
+            // ----------------------------
+            // ENDER MIST (5 seconds)
+            // ----------------------------
+            if (stack.hasCustomName()
+                    && stack.getName().getString().contains("Ender Mist")) {
 
-            world.playSound(
-                    null,
-                    player.getBlockPos(),
-                    SoundEvents.ENTITY_ENDER_DRAGON_FLAP,
-                    SoundCategory.PLAYERS,
-                    1.0f,
-                    1.0f
-            );
+                if (world instanceof ServerWorld serverWorld) {
 
-            // --------------------
-            // ENDER MIST
-            // 5 seconds (100 ticks)
-            // --------------------
-            player.addStatusEffect(
-                    new StatusEffectInstance(
-                            StatusEffects.INVISIBILITY,
-                            100,
-                            0,
-                            false,
-                            false,
-                            true
-                    )
-            );
+                    serverWorld.spawnParticles(
+                            ParticleTypes.DRAGON_BREATH,
+                            player.getX(),
+                            player.getY(),
+                            player.getZ(),
+                            300,
+                            1.5,
+                            0.5,
+                            1.5,
+                            0.02
+                    );
+                }
 
-            world.spawnParticles(
-                    ParticleTypes.PORTAL,
-                    player.getX(),
-                    player.getY() + 1.0,
-                    player.getZ(),
-                    80,
-                    0.5,
-                    0.5,
-                    0.5,
-                    0.2
-            );
+                world.playSound(
+                        null,
+                        player.getBlockPos(),
+                        SoundEvents.ENTITY_ENDER_DRAGON_SHOOT,
+                        SoundCategory.PLAYERS,
+                        1.0f,
+                        1.0f
+                );
 
-            world.playSound(
-                    null,
-                    player.getBlockPos(),
-                    SoundEvents.ENTITY_ENDERMAN_TELEPORT,
-                    SoundCategory.PLAYERS,
-                    1.0f,
-                    1.0f
-            );
+                // poison nearby entities (not yourself)
+                world.getOtherEntities(player, player.getBoundingBox().expand(3), e -> e instanceof PlayerEntity)
+                        .forEach(entity -> {
+                            ((PlayerEntity) entity).addStatusEffect(
+                                    new StatusEffectInstance(StatusEffects.POISON, 100, 0)
+                            );
+                        });
 
-            return new TypedActionResult<>(ActionResult.SUCCESS, stack);
+                return TypedActionResult.success(stack);
+            }
+
+            return TypedActionResult.pass(stack);
         });
     }
 }
