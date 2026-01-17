@@ -4,11 +4,8 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
@@ -21,30 +18,12 @@ public class MaceMod implements ModInitializer {
 
     public static final String MODID = "mace";
 
-    public static Enchantment WIND_CHARGED;
-
-    public static final RegistryKey<Enchantment> WIND_CHARGED_KEY =
+    public static final RegistryKey<Enchantment> WIND_CHARGED =
             RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(MODID, "wind_charged"));
 
     @Override
     public void onInitialize() {
 
-        // Register Wind Charged enchantment (MACE ONLY)
-        WIND_CHARGED = Registry.register(
-                Registries.ENCHANTMENT,
-                Identifier.of(MODID, "wind_charged"),
-                new Enchantment(
-                        Enchantment.Rarity.RARE,
-                        new EquipmentSlot[]{EquipmentSlot.MAINHAND}
-                ) {
-                    @Override
-                    public boolean isAcceptableItem(ItemStack stack) {
-                        return stack.isOf(Items.MACE);
-                    }
-                }
-        );
-
-        // Wind Charged ability
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (world.isClient) return TypedActionResult.pass(player.getStackInHand(hand));
 
@@ -54,7 +33,7 @@ public class MaceMod implements ModInitializer {
             RegistryEntry<Enchantment> entry =
                     world.getRegistryManager()
                             .get(RegistryKeys.ENCHANTMENT)
-                            .getEntry(WIND_CHARGED_KEY)
+                            .getEntry(WIND_CHARGED)
                             .orElse(null);
 
             if (entry == null) return TypedActionResult.pass(stack);
