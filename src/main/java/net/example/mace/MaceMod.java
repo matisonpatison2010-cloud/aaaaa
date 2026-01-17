@@ -17,6 +17,7 @@ import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.tag.ItemTags;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Identifier;
@@ -31,20 +32,17 @@ public class MaceMod implements ModInitializer {
 
     public static final String MODID = "mace";
 
-    // Enchantment registry keys
     public static final RegistryKey<Enchantment> WIND_CHARGED =
-            RegistryKey.of(RegistryKeys.ENCHANTMENT, new Identifier(MODID, "wind_charged"));
+            RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(MODID, "wind_charged"));
 
     public static final RegistryKey<Enchantment> ENDER_MIST =
-            RegistryKey.of(RegistryKeys.ENCHANTMENT, new Identifier(MODID, "ender_mist"));
+            RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(MODID, "ender_mist"));
 
-    // Tracks players launched by Wind Charged
     private static final Set<UUID> WIND_LAUNCHED = new HashSet<>();
 
     @Override
     public void onInitialize() {
 
-        // RIGHT CLICK HANDLER
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (world.isClient) return TypedActionResult.pass(player.getStackInHand(hand));
 
@@ -56,19 +54,19 @@ public class MaceMod implements ModInitializer {
             int windLevel = wind != null ? EnchantmentHelper.getLevel(wind, stack) : 0;
             int mistLevel = mist != null ? EnchantmentHelper.getLevel(mist, stack) : 0;
 
-            // Incompatible enchantments
+            // Prevent using both
             if (windLevel > 0 && mistLevel > 0) {
                 return TypedActionResult.fail(stack);
             }
 
-            /* ---------------- WIND CHARGED ---------------- */
+            /* ---------- WIND CHARGED ---------- */
             if (stack.isOf(Items.MACE) && windLevel > 0) {
 
                 if (player.getItemCooldownManager().isCoolingDown(stack.getItem()))
                     return TypedActionResult.fail(stack);
 
-                double velocity = 1.0 + (windLevel * 0.6); // ~5 blocks at level 1
-                player.addVelocity(0, velocity, 0);
+                double launch = 1.0 + (windLevel * 0.6);
+                player.addVelocity(0, launch, 0);
                 player.velocityModified = true;
                 player.fallDistance = 0;
 
@@ -77,13 +75,13 @@ public class MaceMod implements ModInitializer {
                 world.playSound(
                         null,
                         player.getBlockPos(),
-                        SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST,
+                        SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST.value(),
                         SoundCategory.PLAYERS,
                         1.0f,
                         1.0f
                 );
 
-                world.spawnParticles(
+                ((ServerWorld) world).spawnParticles(
                         ParticleTypes.GUST,
                         player.getX(),
                         player.getY(),
@@ -95,11 +93,11 @@ public class MaceMod implements ModInitializer {
                         0.05
                 );
 
-                player.getItemCooldownManager().set(stack.getItem(), 100); // 5s
+                player.getItemCooldownManager().set(stack.getItem(), 100);
                 return TypedActionResult.success(stack);
             }
 
-            /* ---------------- ENDER MIST ---------------- */
+            /* ---------- ENDER MIST ---------- */
             if (mistLevel > 0 &&
                     (
                             stack.isIn(ItemTags.SWORDS)
@@ -117,7 +115,7 @@ public class MaceMod implements ModInitializer {
                         new AreaEffectCloudEntity(world, player.getX(), player.getY(), player.getZ());
 
                 cloud.setRadius(3.0F);
-                cloud.setDuration((3 + mistLevel) * 20); // seconds
+                cloud.setDuration((3 + mistLevel) * 20);
                 cloud.setParticleType(ParticleTypes.DRAGON_BREATH);
                 cloud.setOwner(player);
 
@@ -132,20 +130,20 @@ public class MaceMod implements ModInitializer {
                 world.playSound(
                         null,
                         player.getBlockPos(),
-                        SoundEvents.ENTITY_ENDER_DRAGON_SHOOT,
+                        SoundEvents.ENTITY_ENDER_DRAGON_SHOOT.value(),
                         SoundCategory.PLAYERS,
                         1.2f,
                         1.0f
                 );
 
-                player.getItemCooldownManager().set(stack.getItem(), 400); // 20s
+                player.getItemCooldownManager().set(stack.getItem(), 400);
                 return TypedActionResult.success(stack);
             }
 
             return TypedActionResult.pass(stack);
         });
 
-        /* -------- FIX FALL DAMAGE BUG -------- */
+        // Remove fall-damage immunity once grounded
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
                 if (player.isOnGround()) {
