@@ -2,28 +2,28 @@ package net.example.mace;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.AreaEffectCloudEntity;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.damage.DamageTypes;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.ActionResult;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.TypedActionResult;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.entity.damage.DamageTypes;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -33,22 +33,22 @@ public class MaceMod implements ModInitializer {
 
     public static final String MODID = "mace";
 
-    // Enchantment registry keys
+    // Enchantment keys
     public static final RegistryKey<Enchantment> WIND_CHARGED_KEY =
             RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(MODID, "wind_charged"));
 
     public static final RegistryKey<Enchantment> ENDER_MIST_KEY =
             RegistryKey.of(RegistryKeys.ENCHANTMENT, Identifier.of(MODID, "ender_mist"));
 
-    // State tracking
+    // State
     private static final Set<UUID> WIND_LAUNCHED = new HashSet<>();
 
     @Override
     public void onInitialize() {
 
-        /* ================================
-           RIGHT CLICK HANDLING
-           ================================ */
+        /* ===============================
+           RIGHT-CLICK ABILITIES
+           =============================== */
         UseItemCallback.EVENT.register((player, world, hand) -> {
 
             if (world.isClient) {
@@ -73,8 +73,9 @@ public class MaceMod implements ModInitializer {
                     if (level > 0 &&
                             !player.getItemCooldownManager().isCoolingDown(stack.getItem())) {
 
-                        double launchHeight = 0.42 + (level * 0.25); // tuned for ~5 blocks at lvl 1
-                        player.addVelocity(0, launchHeight, 0);
+                        // Launch (≈ 5 blocks at level 1, +3 per level)
+                        double velocity = 0.42 + (level * 0.25);
+                        player.addVelocity(0, velocity, 0);
                         player.velocityModified = true;
                         player.fallDistance = 0;
 
@@ -83,7 +84,7 @@ public class MaceMod implements ModInitializer {
                         world.playSound(
                                 null,
                                 player.getBlockPos(),
-                                SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST,
+                                SoundEvents.ENTITY_WIND_CHARGE_WIND_BURST.value(),
                                 SoundCategory.PLAYERS,
                                 1.0f,
                                 1.0f
@@ -125,7 +126,7 @@ public class MaceMod implements ModInitializer {
                     world.playSound(
                             null,
                             player.getBlockPos(),
-                            SoundEvents.ENTITY_ENDER_DRAGON_SHOOT,
+                            SoundEvents.ENTITY_ENDER_DRAGON_SHOOT.value(),
                             SoundCategory.PLAYERS,
                             1.2f,
                             1.0f
@@ -163,11 +164,11 @@ public class MaceMod implements ModInitializer {
             return TypedActionResult.pass(stack);
         });
 
-        /* ================================
+        /* ===============================
            DAMAGE CONTROL
-           ================================ */
+           =============================== */
 
-        // Prevent fall damage ONLY after Wind Charged
+        // Prevent fall damage only after Wind Charged
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
             if (entity instanceof ServerPlayerEntity player) {
 
@@ -184,9 +185,9 @@ public class MaceMod implements ModInitializer {
             return true;
         });
 
-        // Remove fall immunity on landing
-        ServerLivingEntityEvents.AFTER_TICK.register(entity -> {
-            if (entity instanceof ServerPlayerEntity player) {
+        // Remove fall immunity when landing
+        ServerTickEvents.END_SERVER_TICK.register((MinecraftServer server) -> {
+            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
                 if (player.isOnGround()) {
                     WIND_LAUNCHED.remove(player.getUuid());
                 }
