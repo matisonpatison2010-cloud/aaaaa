@@ -1,20 +1,34 @@
 {
   "schemaVersion": 1,
-  "id": "mace",
+  "id": "macemod",
   "version": "1.0.0",
-  "name": "Wind Charged Mace",
-  "description": "Adds the Wind Charged enchantment for the mace.",
-  "authors": ["You"],
+
+  "name": "Mace Mod",
+  "description": "Adds custom mace enchantments including Wind Charged and Ender Mist.",
+  "authors": [
+    "YourName"
+  ],
+  "contact": {
+    "sources": "https://github.com/yourname/mace-mod"
+  },
+
   "license": "MIT",
+
   "environment": "*",
+
   "entrypoints": {
     "main": [
       "net.example.mace.MaceMod"
     ]
   },
+
   "depends": {
-  "fabricloader": ">=0.15.0",
-  "fabric": "*",
-  "minecraft": "1.21.10"
-}
+    "fabricloader": ">=0.15.0",
+    "fabric": "*",
+    "minecraft": "1.21.10"
+  },
+
+  "suggests": {
+    "fabric-api": "*"
+  }
 }
