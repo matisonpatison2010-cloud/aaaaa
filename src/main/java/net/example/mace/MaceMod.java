@@ -2,19 +2,21 @@ package net.example.mace;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
-import net.minecraft.entity.AreaEffectCloudEntity;
+
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.NbtComponent;
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.item.Item;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.particle.ParticleTypes;
-import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.Hand;
 import net.minecraft.util.TypedActionResult;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
 public class MaceMod implements ModInitializer {
@@ -25,118 +27,90 @@ public class MaceMod implements ModInitializer {
     public void onInitialize() {
 
         UseItemCallback.EVENT.register((player, world, hand) -> {
-            if (world.isClient) return TypedActionResult.pass(player.getStackInHand(hand));
-            if (hand != Hand.MAIN_HAND) return TypedActionResult.pass(player.getStackInHand(hand));
+            if (hand != player.getActiveHand()) {
+                return TypedActionResult.pass(player.getStackInHand(hand));
+            }
+
+            // MAIN HAND ONLY
+            if (hand != net.minecraft.util.Hand.MAIN_HAND) {
+                return TypedActionResult.pass(player.getStackInHand(hand));
+            }
 
             ItemStack stack = player.getStackInHand(hand);
 
-            // ✅ FIX 1: NBT access
-            if (stack.getNbt() == null) return TypedActionResult.pass(stack);
+            // MUST BE A MACE
+            if (!stack.isOf(Items.MACE)) {
+                return TypedActionResult.pass(stack);
+            }
 
-            NbtCompound macemod = stack.getOrCreateNbt().getCompound(MODID);
-            if (macemod.isEmpty()) return TypedActionResult.pass(stack);
+            // READ CUSTOM DATA (1.21+ SAFE)
+            NbtComponent component = stack.get(DataComponentTypes.CUSTOM_DATA);
+            if (component == null) {
+                return TypedActionResult.pass(stack);
+            }
 
-            boolean hasWind = macemod.contains("wind_charged");
-            boolean hasMist = macemod.contains("ender_mist");
+            NbtCompound root = component.copyNbt();
+            if (!root.contains(MODID)) {
+                return TypedActionResult.pass(stack);
+            }
 
-            // ❌ Incompatible
-            if (hasWind && hasMist) return TypedActionResult.fail(stack);
+            NbtCompound macemod = root.getCompound(MODID);
 
-            /* ================= WIND CHARGED ================= */
-            if (hasWind && stack.isOf(Items.MACE)) {
-                int level = macemod.getInt("wind_charged");
-                if (level <= 0) return TypedActionResult.pass(stack);
+            int windCharged = macemod.getInt("wind_charged");
+            int enderMist = macemod.getInt("ender_mist");
 
-                if (player.getItemCooldownManager().isCoolingDown(stack.getItem()))
-                    return TypedActionResult.fail(stack);
+            if (windCharged <= 0 && enderMist <= 0) {
+                return TypedActionResult.pass(stack);
+            }
 
-                double boost = 1.0 + (level * 0.6);
-                player.addVelocity(0, boost, 0);
+            // COOLDOWN
+            player.getItemCooldownManager().set(Items.MACE, 40);
+
+            if (!world.isClient) {
+
+                Vec3d look = player.getRotationVec(1.0F);
+                player.addVelocity(
+                        look.x * (0.6 + 0.2 * windCharged),
+                        0.5 + 0.15 * windCharged,
+                        look.z * (0.6 + 0.2 * windCharged)
+                );
                 player.velocityModified = true;
-                player.fallDistance = 0;
 
                 world.playSound(
                         null,
                         player.getBlockPos(),
                         SoundEvents.ENTITY_WIND_CHARGE_THROW,
                         SoundCategory.PLAYERS,
-                        1f,
-                        1f
+                        1.0F,
+                        1.0F
                 );
 
-                if (world instanceof ServerWorld serverWorld) {
-                    serverWorld.spawnParticles(
-                            ParticleTypes.GUST,
-                            player.getX(),
-                            player.getY(),
-                            player.getZ(),
-                            20,
-                            0.2,
-                            0.2,
-                            0.2,
-                            0.01
-                    );
-                }
-
-                player.getItemCooldownManager().set(stack.getItem(), 100);
-                return TypedActionResult.success(stack);
-            }
-
-            /* ================= ENDER MIST ================= */
-            if (hasMist && isTool(stack.getItem())) {
-                int level = macemod.getInt("ender_mist");
-                if (level <= 0) return TypedActionResult.pass(stack);
-
-                if (player.getItemCooldownManager().isCoolingDown(stack.getItem()))
-                    return TypedActionResult.fail(stack);
-
-                if (world instanceof ServerWorld serverWorld) {
-                    AreaEffectCloudEntity cloud = new AreaEffectCloudEntity(
-                            world,
-                            player.getX(),
-                            player.getY(),
-                            player.getZ()
-                    );
-
-                    cloud.setOwner(player);
-                    cloud.setParticleType(ParticleTypes.DRAGON_BREATH);
-                    cloud.setRadius(3.0f);
-                    cloud.setDuration((3 + level) * 20);
-                    cloud.setRadiusGrowth(-0.01f);
-
-                    // ✅ FIX 2: correct damage effect
-                    cloud.addEffect(new StatusEffectInstance(
-                            StatusEffects.INSTANT_DAMAGE,
-                            1,
-                            1
+                if (enderMist > 0) {
+                    player.addStatusEffect(new StatusEffectInstance(
+                            StatusEffects.INVISIBILITY,
+                            40 + enderMist * 20,
+                            0,
+                            false,
+                            false
                     ));
-
-                    serverWorld.spawnEntity(cloud);
-
-                    world.playSound(
-                            null,
-                            player.getBlockPos(),
-                            SoundEvents.ENTITY_ENDER_DRAGON_SHOOT,
-                            SoundCategory.PLAYERS,
-                            1f,
-                            1f
-                    );
                 }
-
-                player.getItemCooldownManager().set(stack.getItem(), 400);
-                return TypedActionResult.success(stack);
             }
 
-            return TypedActionResult.pass(stack);
-        });
-    }
+            if (world.isClient) {
+                for (int i = 0; i < 20; i++) {
+                    world.addParticle(
+                            ParticleTypes.CLOUD,
+                            player.getX(),
+                            player.getY() + 1.0,
+                            player.getZ(),
+                            0.0,
+                            0.1,
+                            0.0
+                    );
+                }
+            }
 
-    private static boolean isTool(Item item) {
-        return item == Items.MACE
-                || item == Items.DIAMOND_SWORD || item == Items.NETHERITE_SWORD
-                || item == Items.DIAMOND_AXE || item == Items.NETHERITE_AXE
-                || item == Items.DIAMOND_PICKAXE || item == Items.NETHERITE_PICKAXE
-                || item == Items.DIAMOND_SHOVEL || item == Items.NETHERITE_SHOVEL
-                || item == Items.DIAMOND_HOE || item == Items.NETHERITE_HOE;
+            return TypedActionResult.success(stack);
+        });
     }
 }
