@@ -1,0 +1,25 @@
+{
+  "anvil_cost": 1,
+  "max_level": 5,
+
+  "min_cost": { "base": 10, "per_level_above_first": 8 },
+  "max_cost": { "base": 30, "per_level_above_first": 10 },
+
+  "supported_items": [
+    "minecraft:sword",
+    "minecraft:axe",
+    "minecraft:pickaxe",
+    "minecraft:shovel",
+    "minecraft:hoe",
+    "minecraft:mace"
+  ],
+
+  "weight": 0,
+  "discoverable": false,
+  "tradeable": false,
+  "treasure": true,
+
+  "incompatible_enchantments": [
+    "mace:wind_charged"
+  ]
+}
